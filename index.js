@@ -35,12 +35,15 @@ const run = async () => {
     eachMessage: async ({ topic, partition, message }) => {
       try {
         let payLoadParsed = JSON.parse(message.value.toString());
+        console.log("Payload:",payLoadParsed);
         if (payLoadParsed) {
           let payloadArr = [];
           let obj = {
             key: "TelematicsEvent",
             value: JSON.stringify(payLoadParsed),
           };
+
+          console.log("Parsed Obj:",obj);
 
           payloadArr.push(obj);
 
