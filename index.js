@@ -1,7 +1,6 @@
 import pkg from "kafkajs";
 const { Kafka } = pkg;
 import dotenv from "dotenv";
-import axios from "axios";
 dotenv.config();
 
 // Create the client with the broker list, minimum 1 broker(bootstrap) is needed
