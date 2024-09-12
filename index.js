@@ -13,9 +13,10 @@ const kafka = new Kafka({
   ],
 });
 
+let currentTimestamp = Math.floor(Date.now() / 1000);
 // Consumer
 const consumerData = kafka.consumer({
-  groupId: "push-data-service-group",
+  groupId: `push-data-service-group-${currentTimestamp}`,
 });
 
 // Producer
