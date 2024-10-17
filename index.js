@@ -27,7 +27,7 @@ const run = async () => {
   await producer.connect();
   console.info("Connected to Kafka Broker.");
   await consumerData.subscribe({
-    topic: process.env.SUBSCRIBE_TOPIC,
+    topic: process.env.SUBSCRIBE_TOPIC || "input",
     fromBeginning: false,
   });
 
@@ -48,7 +48,7 @@ const run = async () => {
           payloadArr.push(obj);
 
           await producer.send({
-            topic: process.env.PUBLISH_TRACK_TOPIC,
+            topic: process.env.PUBLISH_TRACK_TOPIC || "output",
             messages: [
               {
                 key: payLoadParsed.imeiNo,
