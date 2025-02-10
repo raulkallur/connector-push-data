@@ -1,5 +1,5 @@
 {
-  "name": "connector-push-data",
+  "name": "push-data-to-kinesis",
   "type": "module",
   "version": "1.0.0",
   "description": "",
@@ -11,8 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "axios": "^1.7.7",
-    "dotenv": "^16.4.5",
+    "@aws-sdk/client-kinesis": "^3.744.0",
+    "dotenv": "^16.4.7",
     "kafkajs": "^2.2.4"
   }
 }
