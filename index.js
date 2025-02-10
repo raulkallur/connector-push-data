@@ -2,29 +2,56 @@ import pkg from "kafkajs";
 const { Kafka } = pkg;
 import dotenv from "dotenv";
 dotenv.config();
+import { KinesisClient, PutRecordCommand } from "@aws-sdk/client-kinesis";
 
-// Create the client with the broker list, minimum 1 broker(bootstrap) is needed
-// The client will auto-fetch the metadata of others
+// Initialize Kinesis Client
+const kinesisClient = new KinesisClient({
+  region: process.env.AWS_REGION || "us-east-1",
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+// Create the Kafka client
 const kafka = new Kafka({
-  clientId: "push-data-service-" + Date.now(), // Append Current Epoch milliseconds for Random Id
+  clientId: "push-data-service-" + Date.now(),
   brokers: [
     process.env.KAFKA_BOOTSTRAP_SERVER_URL ||
       "my-cluster-kafka-bootstrap.kafka:9092",
   ],
+  sasl: {
+    mechanism: "scram-sha-512",
+    username: process.env.KAFKA_USERNAME,
+    password: process.env.KAFKA_PASSWORD,
+  },
 });
 
 let currentTimestamp = Math.floor(Date.now() / 1000);
-// Consumer
 const consumerData = kafka.consumer({
   groupId: `push-data-service-group-${currentTimestamp}`,
 });
 
-// Producer
-const producer = kafka.producer();
+const publishToKinesis = async (streamName, partitionKey, data) => {
+  const payload = JSON.stringify(data);
+  const command = new PutRecordCommand({
+    StreamName: streamName,
+    PartitionKey: partitionKey,
+    Data: Buffer.from(payload),
+  });
+
+  try {
+    const response = await kinesisClient.send(command);
+    console.log("Successfully sent record to Kinesis:", response);
+    return response;
+  } catch (error) {
+    console.error("Error publishing to Kinesis:", error);
+    throw error;
+  }
+};
 
 const run = async () => {
   await consumerData.connect();
-  await producer.connect();
   console.info("Connected to Kafka Broker.");
   await consumerData.subscribe({
     topic: process.env.SUBSCRIBE_TOPIC || "input",
@@ -35,37 +62,23 @@ const run = async () => {
     eachMessage: async ({ topic, partition, message }) => {
       try {
         let payLoadParsed = JSON.parse(message.value.toString());
-        console.log("Payload:",payLoadParsed);
+        console.log("Payload:", payLoadParsed);
         if (payLoadParsed) {
-          let payloadArr = [];
-          let obj = {
-            key: "TelematicsEvent",
-            value: JSON.stringify(payLoadParsed),
-          };
-
-          console.log("Parsed Obj:",obj);
-
-          payloadArr.push(obj);
-
-          await producer.send({
-            topic: process.env.PUBLISH_TRACK_TOPIC || "output",
-            messages: [
-              {
-                key: payLoadParsed.imeiNo,
-                value: JSON.stringify(payloadArr),
-              },
-            ],
-          });
-  
+          let partitionKey = payLoadParsed?.imeiNo ? payLoadParsed.imeiNo : Math.random().toString(36).substring(2, 15);
+          await publishToKinesis(
+            process.env.KINESIS_STREAM_NAME || "my-kinesis-stream",
+            partitionKey,
+            payLoadParsed
+          );
         }
       } catch (error) {
-        console.log("Eror: ",error);
+        console.error("Error processing message:", error);
       }
     },
   });
 };
 
-run().catch("run error: ", console.error);
+run().catch((error) => console.error("Run error:", error));
 
 consumerData.on("consumer.crash", function () {
   console.log("Crash detected");
@@ -88,7 +101,6 @@ errorTypes.map((type) => {
   process.on(type, async (e) => {
     console.log(`process.on ${type}`);
     console.error(e);
-    // await consumer.disconnect()
     process.exit(0);
   });
 });
